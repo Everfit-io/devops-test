@@ -8,41 +8,34 @@ on:
     branches:
       - main 
 
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  IMAGE_NAME: devops-test-app-image
+  ECR_REPO: ${{ secrets.ECR_REPO }}
+  ECS_CLUSTER_NAME: devops-test-app-cluster
+  ECS_SERVICE_NAME: devops-test-app-service
+
 jobs:
   checkout:
     runs-on: ubuntu-latest
     steps:
         - name: checkout repository
           uses: actions/checkout@v4
-#   build:
-#     runs-on: ubuntu-latest
-#     steps:
-#       - name: Checkout code
-#         uses: actions/checkout@v2
 
-#       - name: Set up Docker Buildx
-#         uses: docker/setup-buildx-action@v1
-
-#       - name: Log in to Amazon ECR
-#         env:
-#           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-#           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-#           AWS_REGION: 'us-west-2'
-#         run: |
-#           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin <your-ecr-repo>
-
-#       - name: Build Docker image
-#         run: |
-#           docker build -t sample-app .
-
-#       - name: Push Docker image to ECR
-#         run: |
-#           docker tag sample-app:latest <your-ecr-repo>/sample-app:latest
-#           docker push <your-ecr-repo>/sample-app:latest
+  build:
+    runs-on: ubuntu-latest
+    needs: checkout
+    steps:
+      - name: Build image
+        run: |
+          export COMMIT_SHA_SHORT=`echo ${GITHUB_SHA} | cut -c1-7`
+          docker build -t $IMAGE_NAME:$COMMIT_SHA_SHORT .
 
   test:
     runs-on: ubuntu-latest
-    needs: checkout
+    needs: build
     steps:
       - name: Set up Poetry
         uses: actions/setup-python@v2
@@ -55,3 +48,46 @@ jobs:
           poetry install
       - name: Run test
         run: poetry run pytest -s
+
+  push-image:
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.event_name != 'pull_request' 
+    steps:
+      - name: Log in to ECR
+        run: |
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO
+
+      - name: Push Docker image to ECR
+        run: |
+          export COMMIT_SHA_SHORT=`echo ${GITHUB_SHA} | cut -c1-7`
+          docker push $IMAGE_NAME:$COMMIT_SHA_SHORT
+
+  remove-image:
+    runs-on: ubuntu-latest
+    needs: push-image
+    steps:
+      - name: Remove image after image was pushed
+        run: |
+          export COMMIT_SHA_SHORT=`echo ${GITHUB_SHA} | cut -c1-7`
+          docker image remove $IMAGE_NAME:$COMMIT_SHA_SHORT -f || true
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: push-image
+    steps:
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v2
+
+      - name: Terraform Init
+        run: terraform init
+        
+      - name: Terraform Apply
+        run: |
+            export COMMIT_SHA_SHORT=$(echo ${GITHUB_SHA} | cut -c1-7)
+            terraform apply -auto-approve \
+            -var="aws_region=$AWS_REGION" \
+            -var="ecs_cluster_name=$CLUSTER_NAME" \
+            -var="ecs_service_name=$SERVICE_NAME" \
+            -var="ecr_repository=$ECR_REPO" \
+            -var="image_tag=$COMMIT_SHA_SHORT"
