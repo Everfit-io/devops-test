@@ -2,9 +2,9 @@ provider "aws" {
   region = var.aws_region
 }
 
-# 1. S3 Bucket
+# S3
 resource "aws_s3_bucket" "devops_test_app_bucket" {
-  bucket = "my-app-bucket-${random_string.bucket_suffix.result}"
+  bucket = "my-app-bucket"
   acl    = "private"
 
   tags = {
@@ -12,12 +12,7 @@ resource "aws_s3_bucket" "devops_test_app_bucket" {
   }
 }
 
-resource "random_string" "bucket_suffix" {
-  length  = 8
-  special = false
-}
-
-# 2. RDS PostgreSQL
+# RDS PostgreSQL
 resource "aws_db_instance" "devops_test_app_db" {
   identifier         = "devops-test-app-db"
   engine             = "postgres"
@@ -34,7 +29,7 @@ resource "aws_db_instance" "devops_test_app_db" {
   }
 }
 
-# 3. ECS Task Definition
+# ECS Task Definition
 resource "aws_ecs_task_definition" "devops_test_app_task" {
   family                   = "devops-test-app-task"
   network_mode             = "awsvpc"
@@ -59,41 +54,7 @@ resource "aws_ecs_task_definition" "devops_test_app_task" {
   ])
 }
 
-# 4. ECS Service
-resource "aws_ecs_service" "devops_test_app_service" {
-  name            = var.ecs_service_name
-  cluster         = var.ecs_cluster_name
-  task_definition = aws_ecs_task_definition.devops_test_app_task.arn
-  desired_count   = 1
-  launch_type     = "FARGATE"
-
-  network_configuration {
-    subnets         = ["subnet-0123456789abcdef0"]
-    security_groups = [aws_security_group.devops_test_app_sg.id]
-    assign_public_ip = true
-  }
-}
-
-# 5. ECR Repository
-resource "aws_ecr_repository" "devops_test_app_ecr" {
-  name = var.ecr_repository
-
-  tags = {
-    Name = "DevOpsTestAppECR"
-  }
-}
-
-# 6. EC2 Instance
-resource "aws_instance" "devops_test_app_instance" {
-  ami           = "ami-0c55b159cbfafe1f0"
-  instance_type = "t2.micro"
-
-  tags = {
-    Name = "devops-test-app-instance"
-  }
-}
-
-# 7. Load Balancer
+# Load Balancer
 resource "aws_elb" "devops_test_app_load_balancer" {
   name               = "devops-test-app-load-balancer"
   availability_zones = ["us-west-2a", "us-west-2b"]  
@@ -118,12 +79,7 @@ resource "aws_elb" "devops_test_app_load_balancer" {
   }
 }
 
-resource "aws_elb_attachment" "devops_test_app_attachment" {
-  elb      = aws_elb.devops_test_app_load_balancer.id
-  instance = aws_instance.devops_test_app_instance.id
-}
-
-# 8. Route 53
+# Route 53
 resource "aws_route53_record" "devops_test_app_record" {
   zone_id = "Z3M3LMX11YY45D" 
   name    = "sample-app.example.com"
@@ -136,7 +92,74 @@ resource "aws_route53_record" "devops_test_app_record" {
   }
 }
 
-# 9. Auto Scaling Group
+# Target group 
+resource "aws_lb_target_group" "devops_test_app_target_group" {
+  name     = "devops-test-app-target-group"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = "vpcdepopstest" 
+}
+
+# Point target group to ELB
+resource "aws_lb_listener" "devops_test_app_listener" {
+  load_balancer_arn = aws_elb.devops_test_app_load_balancer.arn
+  port              = 80
+  protocol          = "HTTP"
+
+  default_action {
+    type = "forward"
+    
+    target_group_arn = aws_lb_target_group.devops_test_app_target_group.arn
+  }
+}
+
+# ECS Service
+resource "aws_ecs_service" "devops_test_app_service" {
+  name            = var.ecs_service_name
+  cluster         = var.ecs_cluster_name
+  task_definition = aws_ecs_task_definition.devops_test_app_task.arn
+  desired_count   = 1
+  launch_type     = "FARGATE"
+
+  network_configuration {
+    subnets         = ["subnet-0123456789abcdef0"]
+    security_groups = [aws_security_group.devops_test_app_sg.id]
+    assign_public_ip = true
+  }
+
+  load_balancer {
+    target_group_arn = aws_lb_target_group.devops_test_app_target_group.arn
+    container_name   = "devops-test-container"
+    container_port   = 80
+  }
+}
+
+# ECR Repository
+resource "aws_ecr_repository" "devops_test_app_ecr" {
+  name = var.ecr_repository
+
+  tags = {
+    Name = "DevOpsTestAppECR"
+  }
+}
+
+# EC2 Instance
+resource "aws_instance" "devops_test_app_instance" {
+  ami           = "ami-0c55b159cbfafe1f0"
+  instance_type = "t2.micro"
+
+  tags = {
+    Name = "devops-test-app-instance"
+  }
+}
+
+# Attach ELB with EC2
+resource "aws_elb_attachment" "devops_test_app_attachment" {
+  elb      = aws_elb.devops_test_app_load_balancer.id
+  instance = aws_instance.devops_test_app_instance.id
+}
+
+# Auto Scaling Group
 resource "aws_launch_configuration" "devops_test_app_lc" {
   name          = "devops-test-app-launch-configuration"
   image_id     = "ami-0c55b159cbfafe1f0" 
@@ -165,7 +188,7 @@ resource "aws_autoscaling_group" "devops_test_app_asg" {
   }
 }
 
-# 10. IAM Role for ECS
+# IAM Role for ECS
 resource "aws_iam_role" "ecs_task_execution_role" {
   name = "ecsTaskExecutionRole"
 
@@ -191,7 +214,7 @@ resource "aws_iam_role" "ecs_task_execution_role" {
 resource "aws_security_group" "devops_test_app_sg" {
   name        = "devops-test-app-security-group"
   description = "Allow HTTP traffic"
-  vpc_id     = "vpc-0123456789abcdef0"  
+  vpc_id     = "vpcdepopstest"  
 
   ingress {
     from_port   = 80
