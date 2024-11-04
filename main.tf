@@ -58,7 +58,7 @@ resource "aws_ecs_task_definition" "devops_test_app_task" {
   container_definitions = jsonencode([
     {
       name              = "devops-test-container"
-      image             = "${var.image_name}"
+      image             = "${var.image_name}:${var.image_tag}"
       essential         = true
       portMappings      = [
         {
