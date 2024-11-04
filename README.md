@@ -40,14 +40,14 @@ Regarding of the stuff `deploy the application to the specified domain https://s
 
 ## Terraform Infrastructure
 The terraform configure following resources:
-- S3
-- RDS Postgresql
+- Route 53
+- Load balance
+- Security group
 - ECS Task definition
 - ECS Service
+- S3
+- RDS Postgresql
 - ECR repo
 - EC2
-- Load balance
-- Route 53
 - Auto scaling gropu
 - IAM
-- Security group
