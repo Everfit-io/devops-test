@@ -7,3 +7,4 @@ docker
 *.zip
 client_secrets.json
 mycreds.txt
+.terraform
