@@ -25,7 +25,7 @@ This CI/CD pipeline implemented using GitHub Actions and the infrastructure depl
 ### 1. Workflow Trigger
 The pipeline is triggered on:
 - Push/merge to the `main` branch.
-- Pull request events targeting the `main` branch.
+- Pull request targeting the `main` branch.
 
 ### 2. Workflow steps:
 #### - Checkout: Uses the `actions/checkout@v4` to check out the repository code

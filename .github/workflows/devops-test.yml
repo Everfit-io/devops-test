@@ -90,4 +90,5 @@ jobs:
             -var="ecs_cluster_name=$CLUSTER_NAME" \
             -var="ecs_service_name=$SERVICE_NAME" \
             -var="ecr_repository=$ECR_REPO" \
+            -var="image_name=$IMAGE_NAME" \
             -var="image_tag=$COMMIT_SHA_SHORT"

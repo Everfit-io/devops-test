@@ -3,8 +3,13 @@ variable "aws_region" {
   default     = "us-west-2"
 }
 
-variable "ecs_cluster_name" {
-  description = "ECS Cluster name"
+variable "image_name" {
+  description = "Docker image's name"
+  type        = string
+}
+
+variable "image_tag" {
+  description = "Tag for the Docker image"
   type        = string
 }
 
@@ -13,13 +18,13 @@ variable "ecs_service_name" {
   type        = string
 }
 
-variable "ecr_repository" {
-  description = "ECR Repository URL for the Docker image"
+variable "ecs_cluster_name" {
+  description = "ECS Cluster name"
   type        = string
 }
 
-variable "image_tag" {
-  description = "Tag for the Docker image"
+variable "ecr_repository" {
+  description = "ECR Repository URL for the Docker image"
   type        = string
 }
 
