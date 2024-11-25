@@ -13,3 +13,6 @@ poetry run python main.py
 ```bash
 poetry run pytest -s
 ```
+
+## DevOps docs
+[docs](./devops/docs/devops-approach.md)
